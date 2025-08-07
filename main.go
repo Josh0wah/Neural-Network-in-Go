@@ -118,5 +118,81 @@ func (nn *neuralNet) backpropagate(x, y, wHidden, bHidden, wOut, bOut, output *m
 		}
 		outputLayerInput.Apply(addBOut, outputLayerInput)
 		output.Apply(applySigmoid, outputLayerInput)
+
+		// Complete backpropagation
+		networkError := new(mat.Dense)
+		networkError.Sub(y, output)
+
+		slopeOutputLayer := new(mat.Dense)
+		applySigmoidPrime := func(_, _ int, v float64) float64 { return sigmoidPrime(v) }
+		slopeOutputLayer.Apply(applySigmoidPrime, output)
+		slopeHiddenLayer := new(mat.Dense)
+		slopeHiddenLayer.Apply(applySigmoidPrime, hiddenLayerActivations)
+
+		dOutput := new(mat.Dense)
+		dOutput.MulElem(networkError, slopeOutputLayer)
+		errorAtHiddenLayer := new(mat.Dense)
+		errorAtHiddenLayer.Mul(dOutput, wOut.T())
+
+		dHiddenLayer := new(mat.Dense)
+		dHiddenLayer.MulElem(errorAtHiddenLayer, slopeHiddenLayer)
+
+		//Adjust parameters
+		wOutAdj := new(mat.Dense)
+		wOutAdj.Mul(hiddenLayerActivations.T(), dOutput)
+		wOutAdj.Scale(nn.config.learningRate, wOutAdj)
+		wOut.Add(wOut, wOutAdj)
+
+		bOutAdj, err := sumAlongAxis(0, dOuput)
+		if err != nil {
+			return err
+		}
+		bOutAdj.Scale(nn.config.learningRate, bOutAdj)
+		bOut.Add(bOut, bOutAdj)
+
+		wHiddenAdj := new(mat.Dense)
+		wHiddenAdj.Mul(x.T(), dHiddenLayer)
+		wHiddenAdj.Scale(nn.config.learningRate, wHiddenAdj)
+		wHidden.Add(wHidden, wHiddenAdj)
+
+		bHiddenAdj, err := sumAllongAxis(0, dHiddenLayer)
+		if err != nil {
+			return err
+		}
+		bHiddenAdj.Scale(nn.config.learningRate, bHiddenAdj)
+		bHidden.Add(bHidden, bHiddenAdj)
 	}
+
+	return nil
+}
+
+// sumAlongAxis sums a matrix along a
+// particular dimension, preserving the
+// other dimension.
+func sumAlongAxis(axis int, m *mat.Dense) (*mat.Dense, error) {
+
+	numRows, numCols := m.Dims()
+
+	var output *mat.Dense
+
+	switch axis {
+	case 0:
+		data := make([]float64, numCols)
+		for i := 0; i < numCols; i++ {
+			col := mat.Col(nil, i, m)
+			data[i] = floats.Sum(col)
+		}
+		output = mat.NewDense(1, numCols, data)
+	case 1:
+		data := make([]float64, numRows)
+		for i := 0; i < numRows; i++ {
+			row := mat.Row(nil, i, m)
+			data[i] = floats.Sum(row)
+		}
+		output = mat.NewDense(numRows, 1, data)
+	default:
+		return nil, errors.New("invalid axis, must be 0 or 1")
+	}
+
+	return output, nil
 }
