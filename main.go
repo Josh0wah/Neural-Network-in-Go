@@ -19,6 +19,79 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+func main() {
+	// Open training data
+	f, err := os.Open("datatrain.csv")
+	if err != nil {
+		log.Fatal("err")
+	}
+	defer f.Close()
+
+	// Create new CSV reader
+	reader := csv.NewReader(f)
+	reader.FieldsPerRecord = 7
+
+	// Read in CSV records
+	rawCSVData, err := reader.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// inputsData and labelsData will hold float values used to form matrices later
+	inputsData := make([]float64, 4*len(rawCSVData))
+	labelsData := make([]float64, 3*len(rawCSVData))
+
+	// inputsIndex will track the currunt indek of input matrix values
+	var inputsIndex int
+	var labelsIndex int
+
+	// Move rows into a slice of floats
+	for idx, record := range rawCSVData {
+		if idx == 0 {
+			continue
+		}
+
+		// Loop over float columns
+		for i, val := range record {
+			parsedVal, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// Add value to labelsData if relevant
+			if i == 4 || i == 5 || i == 6 {
+				labelsData[labelsIndex] = parsedVal
+				labelsIndex++
+				continue
+			}
+
+			// Add value to slice
+			inputsData[inputsIndex] = parsedVal
+			inputsIndex++
+		}
+	}
+
+	// Form matrices
+	inputs := mat.NewDense(len(rawCSVData), 4, inputsData)
+	labels := mat.NewDense(len(rawCSVData), 3, labelsData)
+
+	// Define network arrchitecture and learning parameters
+	config := neuralNetConfig{
+		inputNeurons:  4,
+		outputNeurons: 3,
+		hiddenNeurons: 3,
+		numEpochs:     5000,
+		learningRate:  0.3,
+	}
+
+	// Train neural network
+	network := newNetwork(config)
+	if err := network.train(inputs, labels); err != nil {
+		log.Fatal(err)
+	}
+
+}
+
 // neuralNet will contain the information that defines a trained neural network
 // Note: w = weight, b = bias
 type neuralNet struct {
