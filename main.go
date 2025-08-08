@@ -19,61 +19,29 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+// neuralNet contains all of the information
+// that defines a trained neural network.
+type neuralNet struct {
+	config  neuralNetConfig
+	wHidden *mat.Dense
+	bHidden *mat.Dense
+	wOut    *mat.Dense
+	bOut    *mat.Dense
+}
+
+// neuralNetConfig defines our neural network
+// architecture and learning parameters.
+type neuralNetConfig struct {
+	inputNeurons  int
+	outputNeurons int
+	hiddenNeurons int
+	numEpochs     int
+	learningRate  float64
+}
+
 func main() {
-	// Open training data
-	f, err := os.Open("datatrain.csv")
-	if err != nil {
-		log.Fatal("err")
-	}
-	defer f.Close()
-
-	// Create new CSV reader
-	reader := csv.NewReader(f)
-	reader.FieldsPerRecord = 7
-
-	// Read in CSV records
-	rawCSVData, err := reader.ReadAll()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// inputsData and labelsData will hold float values used to form matrices later
-	inputsData := make([]float64, 4*len(rawCSVData))
-	labelsData := make([]float64, 3*len(rawCSVData))
-
-	// inputsIndex will track the currunt indek of input matrix values
-	var inputsIndex int
-	var labelsIndex int
-
-	// Move rows into a slice of floats
-	for idx, record := range rawCSVData {
-		if idx == 0 {
-			continue
-		}
-
-		// Loop over float columns
-		for i, val := range record {
-			parsedVal, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// Add value to labelsData if relevant
-			if i == 4 || i == 5 || i == 6 {
-				labelsData[labelsIndex] = parsedVal
-				labelsIndex++
-				continue
-			}
-
-			// Add value to slice
-			inputsData[inputsIndex] = parsedVal
-			inputsIndex++
-		}
-	}
-
-	// Form matrices
-	inputs := mat.NewDense(len(rawCSVData), 4, inputsData)
-	labels := mat.NewDense(len(rawCSVData), 3, labelsData)
+	// Form training Matrices
+	inputs, labels := makeInputsAndLabels("data/train.csv")
 
 	// Define network arrchitecture and learning parameters
 	config := neuralNetConfig{
@@ -90,25 +58,40 @@ func main() {
 		log.Fatal(err)
 	}
 
-}
+	// Form the testing matrices
+	testInputs, testLabels := makeInputsAndLabels("data/train.csv")
 
-// neuralNet will contain the information that defines a trained neural network
-// Note: w = weight, b = bias
-type neuralNet struct {
-	config  neuralNetConfig
-	wHidden *mat.Dense
-	bHidden *mat.Dense
-	wOut    *mat.Dense
-	bOut    *mat.Dense
-}
+	// Use trained model  to make predictions
+	predictions, err := network.predict(testInputs)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-// neuralNetConfig definess the neural network's architecture and learning parameters
-type neuralNetConfig struct {
-	inputNeurons  int
-	outputNeurons int
-	hiddenNeurons int
-	numEpochs     int
-	learningRate  float64
+	// Calculate accuracy of the model
+	var truePosNeg int
+	numPreds, _ := predictions.Dims()
+	for i := 0; i < numPreds; i++ {
+		// Get Label
+		labelRow := mat.Row(nil, i, testLabels)
+		var prediction int
+		for idx, label := range labelRow {
+			if label == 1.0 {
+				prediction = idx
+				break
+			}
+		}
+
+		// Accumulate true positive/negative count
+		if predictions.At(i, prediction) == floats.Max(mat.Row(nil, i, predictions)) {
+			truePosNeg++
+		}
+	}
+
+	// Calculate accuacy
+	accuracy := float64(truePosNeg) / float64(numPreds)
+
+	// Output accuracy
+	fmt.Printf("\nAccuracy  = %0.2f\n\n", accuracy)
 }
 
 // newNetwork initializes a new neural network
@@ -302,4 +285,62 @@ func (nn *neuralNet) predict(x *mat.Dense) (*mat.Dense, error) {
 	output.Apply(applySigmoid, outputLayerInput)
 
 	return output, nil
+}
+
+func makeInputsAndLabels(fileName string) (*mat.Dense, *mat.Dense) {
+	// Open training data
+	f, err := os.Open("fileName")
+	if err != nil {
+		log.Fatal("err")
+	}
+	defer f.Close()
+
+	// Create new CSV reader
+	reader := csv.NewReader(f)
+	reader.FieldsPerRecord = 7
+
+	// Read in CSV records
+	rawCSVData, err := reader.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// inputsData and labelsData will hold float values used to form matrices later
+	inputsData := make([]float64, 4*len(rawCSVData))
+	labelsData := make([]float64, 3*len(rawCSVData))
+
+	// inputsIndex will track the currunt indek of input matrix values
+	var inputsIndex int
+	var labelsIndex int
+
+	// Move rows into a slice of floats
+	for idx, record := range rawCSVData {
+		if idx == 0 {
+			continue
+		}
+
+		// Loop over float columns
+		for i, val := range record {
+			parsedVal, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			// Add value to labelsData if relevant
+			if i == 4 || i == 5 || i == 6 {
+				labelsData[labelsIndex] = parsedVal
+				labelsIndex++
+				continue
+			}
+
+			// Add value to slice
+			inputsData[inputsIndex] = parsedVal
+			inputsIndex++
+		}
+	}
+
+	// Form matrices
+	inputs := mat.NewDense(len(rawCSVData), 4, inputsData)
+	labels := mat.NewDense(len(rawCSVData), 3, labelsData)
+	return inputs, labels
 }
