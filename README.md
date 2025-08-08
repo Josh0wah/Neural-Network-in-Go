@@ -1,4 +1,4 @@
-This is a fully functional, single-hidden-layer neural network, trained on the very famous Iris Flower Data Set to identify 3 different species of Iris flowers based on their size and shape.
+This is a fully functional, single-hidden-layer neural network, trained on the very famous Iris Flower Data Set to identify 3 different species of Iris flowers based on measurements of their features.
 I've built this neural network from scratch in Go with the help of a guide from /dwhitena.
 
 <img width="692" height="346" alt="Results" src="https://github.com/user-attachments/assets/9b4663f0-4673-4c40-88bc-3e2c39567c7f" />
