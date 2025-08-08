@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// Form the testing matrices
-	testInputs, testLabels := makeInputsAndLabels("data/train.csv")
+	testInputs, testLabels := makeInputsAndLabels("data/test.csv")
 
 	// Use trained model  to make predictions
 	predictions, err := network.predict(testInputs)
@@ -289,9 +289,9 @@ func (nn *neuralNet) predict(x *mat.Dense) (*mat.Dense, error) {
 
 func makeInputsAndLabels(fileName string) (*mat.Dense, *mat.Dense) {
 	// Open training data
-	f, err := os.Open("fileName")
+	f, err := os.Open(fileName)
 	if err != nil {
-		log.Fatal("err")
+		log.Fatal(err)
 	}
 	defer f.Close()
 
