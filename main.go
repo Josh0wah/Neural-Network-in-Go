@@ -22,20 +22,20 @@ import (
 // neuralNet will contain the information that defines a trained neural network
 // Note: w = weight, b = bias
 type neuralNet struct {
-	config neuralNetConfig
+	config  neuralNetConfig
 	wHidden *mat.Dense
 	bHidden *mat.Dense
-	wOut *mat.Dense
-	bOut *mat.Dense
+	wOut    *mat.Dense
+	bOut    *mat.Dense
 }
 
 // neuralNetConfig definess the neural network's architecture and learning parameters
 type neuralNetConfig struct {
-	inputNeurons int
+	inputNeurons  int
 	outputNeurons int
 	hiddenNeurons int
-	numEpochs int
-	learningRate float64
+	numEpochs     int
+	learningRate  float64
 }
 
 // newNetwork initializes a new neural network
@@ -53,7 +53,7 @@ func sigmoidPrime(x float64) float64 {
 }
 
 // train trains a neural network using backpropagation
-func (nn *neuralNetwork) train(x, y *mat.Dense) error {
+func (nn *neuralNet) train(x, y *mat.Dense) error {
 	// init b and w
 	randSource := rand.NewSource(time.Now().UnixNano())
 	randGen := rand.New(randSource)
@@ -68,7 +68,7 @@ func (nn *neuralNetwork) train(x, y *mat.Dense) error {
 	wOutRaw := wOut.RawMatrix().Data
 	bOutRaw := bOut.RawMatrix().Data
 
-	for _, param := range [][]float64 {
+	for _, param := range [][]float64{
 		wHiddenRaw,
 		bHiddenRaw,
 		wOutRaw,
@@ -102,7 +102,7 @@ func (nn *neuralNet) backpropagate(x, y, wHidden, bHidden, wOut, bOut, output *m
 	for i := 0; i < nn.config.numEpochs; i++ {
 		hiddenLayerInput := new(mat.Dense)
 		hiddenLayerInput.Mul(x, wHidden)
-		addBHidden := func (_, col int, v float64) float64 {
+		addBHidden := func(_, col int, v float64) float64 {
 			return v + bHidden.At(0, col)
 		}
 		hiddenLayerInput.Apply(addBHidden, hiddenLayerInput)
@@ -143,7 +143,7 @@ func (nn *neuralNet) backpropagate(x, y, wHidden, bHidden, wOut, bOut, output *m
 		wOutAdj.Scale(nn.config.learningRate, wOutAdj)
 		wOut.Add(wOut, wOutAdj)
 
-		bOutAdj, err := sumAlongAxis(0, dOuput)
+		bOutAdj, err := sumAlongAxis(0, dOutput)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (nn *neuralNet) backpropagate(x, y, wHidden, bHidden, wOut, bOut, output *m
 		wHiddenAdj.Scale(nn.config.learningRate, wHiddenAdj)
 		wHidden.Add(wHidden, wHiddenAdj)
 
-		bHiddenAdj, err := sumAllongAxis(0, dHiddenLayer)
+		bHiddenAdj, err := sumAlongAxis(0, dHiddenLayer)
 		if err != nil {
 			return err
 		}
@@ -166,9 +166,7 @@ func (nn *neuralNet) backpropagate(x, y, wHidden, bHidden, wOut, bOut, output *m
 	return nil
 }
 
-// sumAlongAxis sums a matrix along a
-// particular dimension, preserving the
-// other dimension.
+// sumAlongAxis sums a matrix along a particular dimension, preserving the other dimension
 func sumAlongAxis(axis int, m *mat.Dense) (*mat.Dense, error) {
 
 	numRows, numCols := m.Dims()
@@ -193,6 +191,42 @@ func sumAlongAxis(axis int, m *mat.Dense) (*mat.Dense, error) {
 	default:
 		return nil, errors.New("invalid axis, must be 0 or 1")
 	}
+
+	return output, nil
+}
+
+// predict makes a prediction basedon a trained neural network
+func (nn *neuralNet) predict(x *mat.Dense) (*mat.Dense, error) {
+	// Ensure that neuralNe is a trained model
+	if nn.wHidden == nil || nn.wOut == nil {
+		return nil, errors.New("Given weights are empty")
+	}
+	if nn.bHidden == nil || nn.bOut == nil {
+		return nil, errors.New("Given weights are empty")
+	}
+
+	// Define output of neural network
+	output := new(mat.Dense)
+
+	// Complete feed forward
+	hiddenLayerInput := new(mat.Dense)
+	hiddenLayerInput.Mul(x, nn.wHidden)
+	addBHidden := func(_, col int, v float64) float64 {
+		return v + nn.bHidden.At(0, col)
+	}
+	hiddenLayerInput.Apply(addBHidden, hiddenLayerInput)
+
+	hiddenLayerActivations := new(mat.Dense)
+	applySigmoid := func(_, _ int, v float64) float64 { return sigmoid(v) }
+	hiddenLayerActivations.Apply(applySigmoid, hiddenLayerInput)
+
+	outputLayerInput := new(mat.Dense)
+	outputLayerInput.Mul(hiddenLayerActivations, nn.wOut)
+	addBOut := func(_, col int, v float64) float64 {
+		return v + nn.bOut.At(0, col)
+	}
+	outputLayerInput.Apply(addBOut, outputLayerInput)
+	output.Apply(applySigmoid, outputLayerInput)
 
 	return output, nil
 }
